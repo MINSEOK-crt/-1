@@ -16,7 +16,7 @@ Windows에서는 `시작.cmd`를 더블클릭합니다. 설치된 Node.js, Codex
 
 ## Gemini 사진 관찰
 
-- **Windows 로컬 시연:** Node.js 20 이상을 설치하고 `Gemini 시작.cmd`를 엽니다. Google AI Studio에서 발급한 키를 숨김 입력창에 넣고, 열린 localhost에서 사진과 공정을 선택한 뒤 **Gemini로 관찰**을 누릅니다. Mac/Linux에서는 키를 현재 셸의 환경 변수 `GEMINI_API_KEY`로 설정하고 `node server.mjs`로 실행합니다.
+- **Windows 로컬 시연:** Node.js 20 이상을 설치하고 `시작.cmd`를 엽니다. 브라우저의 **AI 연결 설정 → Gemini API 키**에 발급받은 키를 붙여넣고 **Gemini 연결**을 누릅니다. **외관 품질검사**에서 사진과 공정을 선택한 뒤 **Gemini로 관찰**을 누릅니다. 키는 실행 중인 로컬 서버 메모리에 유지됩니다. Mac/Linux에서도 `node server.mjs`로 실행하면 같은 방식으로 연결할 수 있습니다.
 - **공개 GitHub Pages에서 사용:** 이 저장소의 Dockerfile을 지원하는 HTTPS 호스팅에 Gemini 서버를 배포합니다. 호스팅 서비스의 비밀 환경 변수로 `GEMINI_API_KEY`와 24자 이상의 무작위 `AEROSCOPE_ACCESS_CODE`를 설정합니다. 포트는 서비스의 `PORT`를 사용하며 기본값은 8765입니다. 외관검사 워크스페이스의 **AI 연결 설정 → 공개 페이지에서 Gemini 서버 연결**에 HTTPS 주소와 접속 코드를 입력합니다. GitHub Pages의 공개 주소는 그대로 사용할 수 있고, 접속 코드는 브라우저 메모리에만 유지됩니다.
 - 기본 모델은 `gemini-3.5-flash-lite`입니다. Google AI Studio 프로젝트에서 이용 가능한 이미지 입력 모델로 바꾸려면 서버에 `GEMINI_MODEL`을 설정합니다. 공개 저장소, JavaScript, URL 또는 백업에 API 키와 접속 코드를 넣지 마세요.
 

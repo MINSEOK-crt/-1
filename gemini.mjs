@@ -1,8 +1,9 @@
 import { processGuide } from './dist/defect-guide.mjs';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-const apiKey = process.env.GEMINI_API_KEY?.trim();
+const configuredKey = process.env.GEMINI_API_KEY?.trim();
 const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
+const modelEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/';
 const maxBody = 6 * 1024 * 1024;
 const imagePattern = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
 const pagesOrigin = 'https://minseok-crt.github.io';
@@ -10,6 +11,8 @@ const accessCode = process.env.AEROSCOPE_ACCESS_CODE?.trim();
 const hash = value => createHash('sha256').update(value).digest();
 const statuses = ['의심 소견', '뚜렷한 이상 미확인', '판독 어려움'];
 let active = false;
+let localApiKey = configuredKey;
+let updatingKey = false;
 
 class RequestError extends Error {
   constructor(status, message) {
@@ -27,14 +30,14 @@ function json(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
-async function readBody(req) {
+async function readBody(req, limit = maxBody) {
   const chunks = [];
   let size = 0;
   for await (const chunk of req.iterator({ destroyOnReturn: false })) {
     size += chunk.length;
-    if (size > maxBody) {
+    if (size > limit) {
       req.resume();
-      throw new RequestError(413, '이미지가 너무 큽니다. 더 작은 사진을 사용하세요.');
+      throw new RequestError(413, limit === maxBody ? '이미지가 너무 큽니다. 더 작은 사진을 사용하세요.' : '키 입력값이 너무 깁니다.');
     }
     chunks.push(chunk);
   }
@@ -59,12 +62,66 @@ function inspectImage(input) {
   return { mimeType: 'image/' + format, data };
 }
 
-async function requestObservation(guide, image) {
+function modelUrl() {
   if (!/^gemini-[a-z0-9.-]+$/.test(model)) {
     throw new RequestError(503, '서버의 GEMINI_MODEL 설정을 확인하세요.');
   }
+  return modelEndpoint + model;
+}
+
+function connectionStatus(apiKey) {
+  return { configured: Boolean(apiKey), model: apiKey ? model : '' };
+}
+
+async function validateKey(key) {
+  const response = await fetch(modelUrl(), {
+    headers: { 'x-goog-api-key': key },
+    signal: AbortSignal.timeout(12000),
+    redirect: 'error',
+  });
+  if (!response.ok) {
+    await response.body?.cancel();
+    if (response.status === 404) throw new RequestError(400, '이 프로젝트에서 설정된 Gemini 모델을 찾을 수 없습니다.');
+    if ([400, 401, 403].includes(response.status)) throw new RequestError(400, 'API 키 또는 프로젝트의 Gemini API 권한을 확인하세요.');
+    throw new RequestError(502, 'Gemini 연결을 확인할 수 없습니다. 잠시 뒤 다시 시도하세요.');
+  }
+  const metadata = await response.json();
+  if (!metadata.supportedGenerationMethods?.includes('generateContent')) {
+    throw new RequestError(400, '이 모델은 현재 검사 화면의 분석 요청을 지원하지 않습니다.');
+  }
+}
+
+async function updateLocalKey(req, res) {
+  if (updatingKey || active) {
+    json(res, 409, { error: '진행 중인 분석 또는 연결 확인이 끝난 뒤 다시 시도하세요.' });
+    return;
+  }
+  if (req.method === 'DELETE') {
+    localApiKey = undefined;
+    json(res, 200, connectionStatus(localApiKey));
+    return;
+  }
+  updatingKey = true;
+  try {
+    const body = await readBody(req, 2048);
+    const key = typeof body?.key === 'string' ? body.key.trim() : '';
+    if (!/^[\x21-\x7e]{20,512}$/.test(key)) {
+      throw new RequestError(400, 'Google AI Studio에서 복사한 API 키를 입력하세요.');
+    }
+    await validateKey(key);
+    localApiKey = key;
+    json(res, 200, connectionStatus(localApiKey));
+  } catch (error) {
+    const message = error instanceof RequestError ? error.message : 'Gemini 연결 확인에 실패했습니다. 네트워크 상태를 확인하세요.';
+    json(res, error instanceof RequestError ? error.status : 502, { error: message });
+  } finally {
+    updatingKey = false;
+  }
+}
+
+async function requestObservation(guide, image, apiKey) {
   const allowed = guide.defects.map(([name]) => name);
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+  const response = await fetch(modelUrl() + ':generateContent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     signal: AbortSignal.timeout(30000),
@@ -141,8 +198,17 @@ export async function handleGemini(req, res, pathname, localOrigin, hosted) {
     json(res, 403, { error: '로컬 검사 화면에서 호출하세요.' });
     return;
   }
+  const apiKey = hosted ? configuredKey : localApiKey;
   if (pathname === '/api/gemini/status' && req.method === 'GET') {
-    json(res, 200, { configured: Boolean(apiKey), model: apiKey ? model : '' });
+    json(res, 200, connectionStatus(apiKey));
+    return;
+  }
+  if (!hosted && pathname === '/api/gemini/key' && ['POST', 'DELETE'].includes(req.method)) {
+    if (req.headers.origin !== localOrigin || req.headers['content-type']?.split(';')[0] !== 'application/json') {
+      json(res, 403, { error: '내 PC의 검사 화면에서만 키를 설정할 수 있습니다.' });
+      return;
+    }
+    await updateLocalKey(req, res);
     return;
   }
   if (pathname !== '/api/gemini/analyze' || req.method !== 'POST') {
@@ -162,7 +228,7 @@ export async function handleGemini(req, res, pathname, localOrigin, hosted) {
     const body = await readBody(req);
     const guide = processGuide(body?.process);
     if (!guide) throw new RequestError(400, '제조 공정을 선택하세요.');
-    json(res, 200, await requestObservation(guide, inspectImage(body.image)));
+    json(res, 200, await requestObservation(guide, inspectImage(body.image), apiKey));
   } catch (error) {
     const message = error instanceof RequestError ? error.message : 'Gemini 연결이 지연되었거나 네트워크에 문제가 있습니다.';
     json(res, error.status || 502, { error: message });

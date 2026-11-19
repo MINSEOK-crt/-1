@@ -15,6 +15,20 @@ async function readResponse(response) {
   return data;
 }
 
+async function updateLocalKey(method, key) {
+  if (!isLocalGemini) throw new Error('내 PC의 검사 화면에서 API 키를 입력하세요.');
+  const response = await request('/api/gemini/key', {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: method === 'POST' ? JSON.stringify({ key }) : undefined,
+    signal: AbortSignal.timeout(15000),
+  });
+  return readResponse(response);
+}
+
+export const setLocalGeminiKey = key => updateLocalKey('POST', key);
+export const clearLocalGeminiKey = () => updateLocalKey('DELETE');
+
 export async function geminiStatus() {
   if (!isLocalGemini && !hostedConnection) return { configured: false };
   const response = await request('/api/gemini/status', { signal: AbortSignal.timeout(5000) });

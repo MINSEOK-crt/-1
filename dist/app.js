@@ -1,5 +1,5 @@
 import { processes, processGuide } from './defect-guide.mjs';
-import { isLocalGemini, geminiStatus, geminiAnalysis, connectGeminiServer, disconnectGeminiServer } from './gemini-client.mjs';
+import { isLocalGemini, geminiStatus, geminiAnalysis, connectGeminiServer, disconnectGeminiServer, setLocalGeminiKey, clearLocalGeminiKey } from './gemini-client.mjs';
 
 const icons={grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',scan:'<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 12h18"/><rect x="7" y="7" width="10" height="10" rx="2"/>',image:'<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m21 15-5-5L5 21"/>',camera:'<path d="M8 5 10 3h4l2 2h4a1 1 0 0 1 1 1v13H3V6a1 1 0 0 1 1-1Z"/><circle cx="12" cy="12" r="4"/>',layers:'<path d="m12 3 10 5-10 5L2 8Zm-10 9 10 5 10-5M2 16l10 5 10-5"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',cpu:'<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v4m6-4v4M9 18v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4"/>',book:'<path d="M12 5c-3-2-7-2-10 0v15c3-2 7-2 10 0 3-2 7-2 10 0V5c-3-2-7-2-10 0Zm0 0v15"/>',settings:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',arrow:'<path d="m9 5 7 7-7 7"/>',upload:'<path d="M12 16V3m-5 5 5-5 5 5M3 16v5h18v-5"/>',download:'<path d="M12 3v13m-5-5 5 5 5-5M3 16v5h18v-5"/>',plus:'<path d="M12 4v16M4 12h16"/>',check:'<path d="m5 12 4 4L19 6"/>',external:'<path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7"/>',shield:'<path d="m12 2 9 4v6c0 6-9 10-9 10S3 18 3 12V6Z"/><path d="m8 12 3 3 5-6"/>',file:'<path d="M14 2H4v20h16V8Zm0 0v6h6M8 13h8m-8 4h8"/>',stop:'<rect x="5" y="5" width="14" height="14" rx="1"/>',search:'<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>',plane:'<path d="m2 12 7-2 3-8 2 1-1 7 8 4-1 2-7-1-2 6H9v-7l-7 1Z"/>'};
 const icon=(n)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[n]||icons.file}</svg>`;
@@ -10,7 +10,7 @@ const localDate=(date)=>new Date(date).toLocaleString('ko-KR',{year:'numeric',mo
 const uid=(prefix)=>`${prefix}-${new Date().toISOString().slice(0,10).replaceAll('-','')}-${crypto.randomUUID().slice(0,6).toUpperCase()}`;
 const btn=(text,action,kind='',ic='')=>`<button type="button" class="btn ${kind}" data-action="${action}">${ic?icon(ic):''}${text}</button>`;
 let db,state={records:[],dataset:[],settings:{company:'내부 공급용 워크스페이스',station:'검사 스테이션 01',classes:['양품','스크래치','찍힘','오염'],threshold:80,modelUrl:''}};
-let view='inspect',source='upload',selected=null,result=null,stream=null,model=null,modelName='',modelOrigin='',busy=false,search='',filter='all',demoType='스크래치';
+let view=window.location?.hash==='#model'?'model':'inspect',source='upload',selected=null,result=null,stream=null,model=null,modelName='',modelOrigin='',busy=false,search='',filter='all',demoType='스크래치';
 let inspectionForm={part:'',lot:'',area:'표면 / 가공면',inspector:'김민석',verdict:'미검토',notes:''};
 let notificationTimer;
 const newChecklist = (process = 'machining') => ({ process, types: [], standardRef: '' });
@@ -45,11 +45,11 @@ function defectChecklist() {
 
 function geminiPanel() {
  const info = gemini.configured ? '분석을 요청하면 선택한 사진과 공정이 Google로 전송됩니다. 공개 가능한 시연 사진 또는 외부 전송이 승인된 이미지를 사용하세요.'
-   : isLocalGemini ? 'Gemini 시작.cmd로 실행하거나 로컬 서버에 Gemini API 키를 설정하세요.'
+   : isLocalGemini ? 'AI 연결 설정에서 Gemini API 키를 입력하세요.'
    : 'Gemini 분석에는 HTTPS 서버 연결이 필요합니다. 사진 등록, 체크리스트, 검토 기록은 바로 사용할 수 있습니다.';
  const button = gemini.configured
    ? btn(analyzingImage ? 'Gemini 분석 중…' : 'Gemini로 관찰', 'analyze-gemini', 'primary', 'scan')
-   : btn('Gemini 연결 안내', 'go-model', '', 'cpu');
+   : btn(isLocalGemini ? 'Gemini API 키 입력' : 'Gemini 연결 안내', 'go-model', '', 'cpu');
  return '<section class="card"><div class="card-head"><h2>Gemini 사진 관찰</h2><span class="pill ' +
    (gemini.configured ? '' : 'gray') + '">' + (gemini.configured ? '키 설정됨' : '연결 필요') +
    '</span></div><div class="card-body"><p class="smalltext">' + info + '</p>' +
@@ -57,6 +57,13 @@ function geminiPanel() {
 }
 
 function geminiSetup() {
+ const localSetup = isLocalGemini
+   ? '<form id="gemini-key-form"><label class="field">Gemini API 키<input id="gemini-api-key" type="password" placeholder="Google AI Studio에서 발급한 키" required maxlength="512" autocomplete="off" spellcheck="false"></label>' +
+     '<p class="smalltext">연결할 때 Google에서 키를 확인합니다. 키는 이 PC에서 프로그램이 실행되는 동안 사용됩니다.</p>' +
+     '<div class="model-actions"><button type="submit" class="btn primary">' + (gemini.configured ? '새 키로 연결' : 'Gemini 연결') + '</button>' +
+     (gemini.configured ? btn('키 연결 해제', 'gemini-clear-local') : '') + '</div></form>'
+   : '<p>내 PC에서 키를 입력하려면 로컬 실행판을 내려받아 압축을 풀고 <strong>시작.cmd</strong>를 실행하세요.</p>' +
+     '<p><a href="http://localhost:8765/#model">내 PC의 키 입력 화면 열기 ↗</a></p>';
  const remoteSetup = isLocalGemini ? '' : gemini.configured
    ? '<div class="model-actions">' + btn('서버 연결 해제', 'gemini-disconnect') + '</div>'
    : '<details class="alternate-model"><summary>공개 페이지에서 Gemini 서버 연결</summary>' +
@@ -66,8 +73,7 @@ function geminiSetup() {
      '<div class="model-actions">' + btn('Gemini 서버 연결', 'gemini-connect', 'primary') + '</div></details>';
  const messages = [
    '<section class="card gemini-setup"><div class="card-head"><h2>Gemini 연결</h2></div><div class="card-body">',
-   '<p>Windows에서 <strong>Gemini 시작.cmd</strong>를 열고 Google AI Studio에서 발급한 키를 입력하세요. 입력한 키는 실행 중인 로컬 서버에서 사용합니다.</p>',
-   '<p class="smalltext">같은 브라우저에서도 공개 주소와 로컬 실행판의 기록은 별도로 저장됩니다. 기록을 옮길 때는 JSON 백업과 복원을 사용하세요.</p>',
+   localSetup,
    '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio API 키 ↗</a> · ',
    '<a href="https://github.com/MINSEOK-crt/-1/archive/refs/heads/main.zip">로컬 실행판 내려받기</a>',
    '<p class="smalltext" id="gemini-config-status">' + (gemini.configured ? '키 설정됨 · ' + esc(gemini.model) : '현재 화면에는 Gemini 키가 설정되지 않았습니다.') + '</p>',
@@ -75,6 +81,43 @@ function geminiSetup() {
    '</div></section>',
  ];
  return messages.join('');
+}
+
+async function connectLocalGemini(form) {
+ if (geminiConnectionBusy) return;
+ const input = $('#gemini-api-key', form);
+ const key = input.value.trim();
+ input.value = '';
+ const button = $('[type=submit]', form);
+ const label = button.textContent;
+ button.disabled = true;
+ button.textContent = '연결 확인 중…';
+ geminiConnectionBusy = true;
+ try {
+   gemini = await setLocalGeminiKey(key);
+   if (result?.kind === 'gemini') result = null;
+   if (['inspect', 'model'].includes(view)) render();
+   toast('Gemini 키를 연결했습니다. 외관 품질검사에서 사진을 분석하세요.');
+ } catch (error) {
+   toast(error.message || 'Gemini에 연결하지 못했습니다.');
+ } finally {
+   geminiConnectionBusy = false;
+   button.disabled = false;
+   button.textContent = label;
+ }
+}
+
+async function disconnectLocalGemini() {
+ if (geminiConnectionBusy) return;
+ geminiConnectionBusy = true;
+ try {
+   gemini = await clearLocalGeminiKey();
+   if (result?.kind === 'gemini') result = null;
+   if (['inspect', 'model'].includes(view)) render();
+   toast('이 PC에서 Gemini 키 연결을 해제했습니다.');
+ } finally {
+   geminiConnectionBusy = false;
+ }
 }
 
 async function connectHostedGemini() {
@@ -91,7 +134,9 @@ async function connectHostedGemini() {
 
 async function refreshGemini() {
  try {
-   gemini = await geminiStatus();
+   const status = await geminiStatus();
+   if (geminiConnectionBusy) return;
+   gemini = status;
    if (gemini.configured && ['inspect', 'model'].includes(view)) render();
  } catch {
    // A static fallback server can still run the inspection workspace.
@@ -163,6 +208,10 @@ function settingsView(){return `${head('워크스페이스 설정','공급받는
 function bind(){
  $$('[data-nav]').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();navigate(el.dataset.nav)}));
  $$('[data-action]').forEach(el=>el.addEventListener('click',()=>runAction(el.dataset.action)));
+ $('#gemini-key-form')?.addEventListener('submit', event => {
+   event.preventDefault();
+   void connectLocalGemini(event.currentTarget);
+ });
  $$('[data-form]').forEach(el=>el.addEventListener('input',()=>{inspectionForm[el.dataset.form]=el.value}));
  $('#defect-process')?.addEventListener('change', e => {
    checklist = newChecklist(e.target.value);
@@ -202,6 +251,7 @@ async function runAction(action){try{
  case 'dataset-upload':chooseFiles('image/jpeg,image/png,image/webp',true,async files=>{if(files.length>30)throw new Error('한 번에 최대 30장까지 추가할 수 있습니다.');const items=[];for(const f of files){const image=await readImage(f,'upload');items.push({...image,id:uid('IMG'),label:'미분류',part:'',lot:'',createdAt:now(),notes:''})}await mutate(()=>state.dataset.push(...items));render();toast(`${items.length}장의 이미지를 수집함에 추가했습니다.`)});break;
  case 'simulate':if(!selected||selected.origin!=='synthetic')throw new Error('합성 샘플에서만 시연 시나리오를 사용할 수 있습니다.');result={kind:'demo',label:demoType,model:'고정 시연 시나리오',scores:[],note:'선택한 시나리오에 따른 고정 결과입니다. 실제 판독 결과가 아닙니다.',createdAt:now()};render();break;
  case 'analyze-gemini':await runGemini();break;
+ case 'gemini-clear-local':await disconnectLocalGemini();break;
  case 'gemini-connect':await connectHostedGemini();break;
  case 'gemini-disconnect':disconnectGeminiServer();gemini={configured:false,model:''};render();toast('Gemini 서버 연결을 해제했습니다.');break;
  case 'predict':await predict();break;
