@@ -25,6 +25,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure Pages
         uses: actions/configure-pages@v5
+      - name: Version browser assets
+        run: |
+          sed -i -e "s|./styles\.css\"|./styles.css?v=${GITHUB_SHA}\"|" \
+                 -e "s|./app\.js\"|./app.js?v=${GITHUB_SHA}\"|" dist/index.html
+          sed -i -e "s|./defect-guide\.mjs'|./defect-guide.mjs?v=${GITHUB_SHA}'|" \
+                 -e "s|./gemini-client\.mjs'|./gemini-client.mjs?v=${GITHUB_SHA}'|" dist/app.js
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
