@@ -1,0 +1,6 @@
+**
+!server.mjs
+!gemini.mjs
+!dist/
+dist/*
+!dist/defect-guide.mjs

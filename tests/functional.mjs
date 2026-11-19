@@ -1,10 +1,11 @@
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const source=await fs.readFile(new URL('../dist/app.js',import.meta.url),'utf8');
-const cutoff=source.lastIndexOf('try{await load();render()}');
+const cutoff=source.lastIndexOf('try{await load();');
 assert(cutoff>0);
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
-const api=await new AsyncFunction('window',source.slice(0,cutoff)+`
+const appBody=source.slice(0,cutoff).replace(/^import .+;\r?\n/gm,'');
+const api=await new AsyncFunction('window',appBody+`
  persist=async()=>{};
  return {zip,csv,esc,validImage,restoreBackup,getState:()=>state,stats};
 `)({addEventListener(){}});
@@ -24,6 +25,8 @@ assert(api.stats().replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').includes('검토 
 await assert.rejects(()=>api.restoreBackup(JSON.stringify({...backup,dataset:[{...item,image:'data:image/svg+xml;base64,PHN2Zz4='}]})));
 assert.equal(api.getState().dataset.length,1);
 const archive=api.zip([['labels/스크래치/sample.bin',new Uint8Array([0,1,255,50])],['manifest.json','{"test":"항공제조"}'],['empty.txt','']]);
-await fs.writeFile(new URL('../../zip-interoperability-test.zip',import.meta.url),new Uint8Array(await archive.arrayBuffer()));
+const archiveBytes=new DataView(await archive.arrayBuffer());
+assert.equal(archiveBytes.getUint32(0,true),0x04034b50);
+assert.equal(archiveBytes.getUint32(archiveBytes.byteLength-22,true),0x06054b50);
 console.log('PASS: HTML escaping, CSV injection and quoting, image restore format, duplicate restore, re-review pending count, ZIP generation.');
 
