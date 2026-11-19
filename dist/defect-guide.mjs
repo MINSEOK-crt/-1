@@ -1,7 +1,7 @@
 export const processes = {
   machining: {
     label: '금속 가공',
-    source: 'AEROSCOPE 시연용 항목',
+    source: '시연용 항목',
     defects: [
       ['긁힘', '가공면에 주변 가공 결과 다른 선형 자국이 보이는지 확인합니다.'],
       ['찍힘', '표면이나 모서리의 국소 눌림을 확인합니다.'],
@@ -33,7 +33,7 @@ export const processes = {
     label: '도금·표면처리',
     source: 'KAMP AI스퀘어 전기아연도금 외관검사 사례 · 2쪽',
     url: 'https://aisquare.kamp-ai.kr/upload_data/mainImg/aae031aa-395c-47d1-88f8-2b2b5c176b78.pdf#page=2',
-    note: '공개 사례의 적용 분야를 참고했습니다. 아래 세부 항목은 AEROSCOPE 시연용 예시입니다.',
+    note: '공개 사례의 적용 분야를 참고했습니다. 아래 세부 항목은 워크스페이스 시연용 예시입니다.',
     defects: [
       ['얼룩 의심', '국소 자국이 조명의 반사인지 다른 각도에서 확인합니다.'],
       ['색상 불균일 의심', '동일한 조명에서 정상 기준 사진과 비교합니다.'],

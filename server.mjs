@@ -25,8 +25,8 @@ const server=http.createServer(async (req,res)=>{
 });
 server.on('error',error=>{console.error(error.code==='EADDRINUSE'?`포트 ${port}가 사용 중입니다. 기존 서버를 닫거나 다른 포트로 실행하세요.`:error.message);process.exit(1)});
 server.listen(port,hosted?'0.0.0.0':'localhost',()=>{
- if(hosted){console.log(`AEROSCOPE Gemini 서버 · 포트 ${port}`);return}
+ if(hosted){console.log(`외관검사 워크스페이스 Gemini 서버 · 포트 ${port}`);return}
  const url=`http://localhost:${port}/`;
- console.log(`AEROSCOPE 제조기업 외관 품질검사\n${url}\n종료하려면 이 창을 닫거나 Ctrl+C를 누르세요.`);
+ console.log(`외관검사 워크스페이스\n${url}\n종료하려면 이 창을 닫거나 Ctrl+C를 누르세요.`);
  if(process.platform==='win32'&&process.argv.includes('--open'))spawn('cmd.exe',['/c','start','',url],{windowsHide:true,stdio:'ignore'}).unref();
 });

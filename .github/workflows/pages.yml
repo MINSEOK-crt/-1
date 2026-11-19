@@ -1,4 +1,4 @@
-name: Deploy AEROSCOPE to GitHub Pages
+name: Deploy inspection workspace to GitHub Pages
 
 on:
   push:

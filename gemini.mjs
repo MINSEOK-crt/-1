@@ -119,7 +119,7 @@ async function requestObservation(guide, image) {
 export async function handleGemini(req, res, pathname, localOrigin, hosted) {
   if (hosted) {
     if (req.headers.origin !== pagesOrigin) {
-      json(res, 403, { error: 'AEROSCOPE 공개 검사 화면에서 연결하세요.' });
+      json(res, 403, { error: '외관검사 워크스페이스의 공개 검사 화면에서 연결하세요.' });
       return;
     }
     res.setHeader('Access-Control-Allow-Origin', pagesOrigin);
