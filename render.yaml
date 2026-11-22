@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: visual-inspection-gemini
+    runtime: docker
+    plan: free
+    branch: main
+    autoDeployTrigger: off
+    healthCheckPath: /healthz
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AEROSCOPE_ACCESS_CODE
+        generateValue: true

@@ -13,6 +13,11 @@ const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=
 const server=http.createServer(async (req,res)=>{
  try{
   const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
+  if(hosted&&pathname==='/healthz'&&['GET','HEAD'].includes(req.method)){
+   res.writeHead(200,{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'});
+   res.end(req.method==='HEAD'?undefined:'ok');
+   return;
+  }
   if(pathname.startsWith('/api/gemini/')){await handleGemini(req,res,pathname,origin,hosted);return}
   if(hosted){res.writeHead(404);res.end('Not found');return}
   if(!['GET','HEAD'].includes(req.method)){res.writeHead(405);res.end();return}

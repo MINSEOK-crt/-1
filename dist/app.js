@@ -67,7 +67,7 @@ function geminiSetup() {
  const remoteSetup = isLocalGemini ? '' : gemini.configured
    ? '<div class="model-actions">' + btn('서버 연결 해제', 'gemini-disconnect') + '</div>'
    : '<details class="alternate-model"><summary>공개 페이지에서 Gemini 서버 연결</summary>' +
-     '<p class="smalltext">관리자가 제공한 HTTPS 주소와 연결 코드를 입력하세요. Google API 키는 서버에 설정합니다.</p>' +
+     '<p class="smalltext">발표장에서는 서버 주소와 연결 코드로 접속할 수 있습니다. 처음 준비한다면 <a href="https://github.com/MINSEOK-crt/-1#공개-발표용-gemini-서버-준비" target="_blank" rel="noopener noreferrer">발표용 서버 준비</a>를 확인하세요.</p>' +
      '<div class="form-grid"><label class="field">서버 주소<input id="gemini-server-url" type="url" placeholder="https://…" autocomplete="off"></label>' +
      '<label class="field">서버 연결 코드<input id="gemini-access-code" type="password" maxlength="200" autocomplete="off"></label></div>' +
      '<div class="model-actions">' + btn('Gemini 서버 연결', 'gemini-connect', 'primary') + '</div></details>';
