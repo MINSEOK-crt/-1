@@ -4,3 +4,4 @@
 !dist/
 dist/*
 !dist/defect-guide.mjs
+!dist/gemini-api.mjs

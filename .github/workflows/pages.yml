@@ -31,6 +31,8 @@ jobs:
                  -e "s|./app\.js\"|./app.js?v=${GITHUB_SHA}\"|" dist/index.html
           sed -i -e "s|./defect-guide\.mjs'|./defect-guide.mjs?v=${GITHUB_SHA}'|" \
                  -e "s|./gemini-client\.mjs'|./gemini-client.mjs?v=${GITHUB_SHA}'|" dist/app.js
+          sed -i -e "s|./defect-guide\.mjs'|./defect-guide.mjs?v=${GITHUB_SHA}'|" \
+                 -e "s|./gemini-api\.mjs'|./gemini-api.mjs?v=${GITHUB_SHA}'|" dist/gemini-client.mjs
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
