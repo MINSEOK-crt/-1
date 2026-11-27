@@ -24,6 +24,37 @@ function modelUrl(model) {
   return modelEndpoint + model;
 }
 
+async function googleError(response) {
+  const payload = await response.json().catch(() => ({}));
+  const error = payload?.error;
+  const reasons = Array.isArray(error?.details) ? error.details.map(detail => detail?.reason) : [];
+  const message = typeof error?.message === 'string' ? error.message : '';
+  const status = response.status;
+  const failure = (text, localStatus = 502) => new GeminiRequestError(localStatus, `Google 오류 ${status} · ${text}`);
+
+  if (status === 402 || reasons.some(reason => ['BILLING_DISABLED', 'BILLING_NOT_ACTIVE', 'BILLING_REQUIRED'].includes(reason)) ||
+      /free tier (?:is )?not available|billing (?:is )?(?:not enabled|disabled|required)|enable billing|paid (?:tier|plan) (?:is )?required/i.test(message)) {
+    return failure('프로젝트의 API 결제 설정 또는 크레딧 상태를 확인하세요. 무료 등급을 사용할 수 있는 프로젝트의 키로도 바꿀 수 있습니다.');
+  }
+  if (status === 401 || reasons.includes('API_KEY_INVALID') || /API key (?:is )?(?:not valid|expired)|reported as leaked/i.test(message)) {
+    return failure('API 키가 유효하지 않습니다. Google AI Studio에서 사용 가능한 키를 다시 복사해 연결하세요.', 400);
+  }
+  if (reasons.some(reason => ['API_KEY_HTTP_REFERRER_BLOCKED', 'API_KEY_SERVICE_BLOCKED', 'API_KEY_IP_ADDRESS_BLOCKED', 'SERVICE_DISABLED'].includes(reason))) {
+    return failure('API 키 제한 또는 프로젝트 설정에서 현재 요청이 차단됐습니다. Gemini API 사용 권한과 웹사이트 제한을 확인하세요.', 403);
+  }
+  if (status === 403) return failure('프로젝트에 Gemini 분석 권한이 없습니다. Google AI Studio에서 프로젝트 확인 및 결제 등급을 확인하세요.', 403);
+  if (status === 404) return failure('이 프로젝트에서 현재 Gemini 모델을 사용할 수 없습니다. 프로젝트의 모델 이용 가능 여부를 확인하세요.');
+  if (status === 429) {
+    if (/\blimit\s*:\s*0\b/i.test(message)) return failure('이 프로젝트의 모델 호출 한도가 0입니다. Google AI Studio에서 사용량과 등급을 확인하세요.', 429);
+    return failure('Gemini 호출 한도에 도달했습니다. Google AI Studio에서 사용량을 확인하고 다시 시도하세요.', 429);
+  }
+  if (status === 400 && error?.status === 'FAILED_PRECONDITION') {
+    return failure('프로젝트의 API 사용 조건을 충족하지 못했습니다. Google AI Studio에서 프로젝트 상태를 확인하세요.');
+  }
+  if (status === 400) return failure('Google이 요청 형식을 거절했습니다. 다른 JPG 또는 PNG 사진으로 한 번 더 시도해 보세요.', 400);
+  return failure('Gemini에 일시적으로 연결할 수 없습니다. 잠시 뒤 다시 시도하세요.');
+}
+
 export async function validateGeminiKey(key, model = defaultGeminiModel) {
   const response = await fetch(modelUrl(model), {
     headers: { 'x-goog-api-key': key },
@@ -32,12 +63,7 @@ export async function validateGeminiKey(key, model = defaultGeminiModel) {
     cache: 'no-store',
     credentials: 'omit',
   });
-  if (!response.ok) {
-    await response.body?.cancel().catch(() => {});
-    if (response.status === 404) throw new GeminiRequestError(400, '이 프로젝트에서 설정된 Gemini 모델을 찾을 수 없습니다.');
-    if ([400, 401, 403].includes(response.status)) throw new GeminiRequestError(400, 'API 키, 프로젝트 권한 또는 Gemini 결제 등급을 확인하세요.');
-    throw new GeminiRequestError(502, 'Gemini 연결을 확인할 수 없습니다. 잠시 뒤 다시 시도하세요.');
-  }
+  if (!response.ok) throw await googleError(response);
   const metadata = await response.json();
   if (!Array.isArray(metadata?.supportedGenerationMethods) || !metadata.supportedGenerationMethods.includes('generateContent')) {
     throw new GeminiRequestError(400, '이 모델은 현재 검사 화면의 분석 요청을 지원하지 않습니다.');
@@ -75,11 +101,7 @@ export async function requestObservation(guide, image, apiKey, model = defaultGe
       },
     }),
   });
-  if (response.status === 429) throw new GeminiRequestError(429, 'Gemini 사용량 한도를 확인하세요. 무료 등급을 사용할 수 없는 프로젝트라면 API 이용 설정이 필요합니다.');
-  if ([400, 401, 403, 404].includes(response.status)) {
-    throw new GeminiRequestError(502, 'Gemini 호출이 거절되었습니다. API 키, 사용 가능한 모델 및 프로젝트 결제 등급을 확인하세요.');
-  }
-  if (!response.ok) throw new GeminiRequestError(502, 'Gemini를 일시적으로 사용할 수 없습니다.');
+  if (!response.ok) throw await googleError(response);
   try {
     const payload = await response.json();
     const parts = payload.candidates?.[0]?.content?.parts || [];

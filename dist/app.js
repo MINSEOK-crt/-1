@@ -17,6 +17,7 @@ const newChecklist = (process = 'machining') => ({ process, types: [], standardR
 let checklist = newChecklist();
 let gemini = { configured: false, model: '' };
 let analyzingImage = null;
+let geminiIssue = null;
 let geminiConnectionBusy = false;
 let alternateOpen = false;
 let collectionLabel = '미분류';
@@ -49,10 +50,12 @@ function geminiPanel() {
  const button = gemini.configured
    ? btn(analyzingImage ? 'Gemini 분석 중…' : 'Gemini로 관찰', 'analyze-gemini', 'primary', 'scan')
    : btn('Gemini API 키 입력', 'go-model', '', 'cpu');
+ const issue = geminiIssue?.image === selected && geminiIssue?.checklist === checklist
+   ? '<p class="inline-note" role="alert">' + esc(geminiIssue.message) + '</p>' : '';
  return '<section class="card"><div class="card-head"><h2>Gemini 사진 관찰</h2><span class="pill ' +
    (gemini.configured ? '' : 'gray') + '">' + (gemini.configured ? '키 설정됨' : '연결 필요') +
    '</span></div><div class="card-body"><p class="smalltext">' + info + '</p>' +
-   (result?.kind === 'gemini' ? resultMarkup() : '') + '<div class="model-actions">' + button + '</div></div></section>';
+   (result?.kind === 'gemini' ? resultMarkup() : '') + issue + '<div class="model-actions">' + button + '</div></div></section>';
 }
 
 function geminiSetup() {
@@ -84,6 +87,7 @@ async function connectGemini(form) {
  geminiConnectionBusy = true;
  try {
    gemini = await connectGeminiKey(key);
+   geminiIssue = null;
    if (result?.kind === 'gemini') result = null;
    if (['inspect', 'model'].includes(view)) render();
    toast('Gemini 키를 연결했습니다. 외관 품질검사에서 사진을 분석하세요.');
@@ -101,6 +105,7 @@ async function disconnectGemini() {
  geminiConnectionBusy = true;
  try {
    gemini = await clearGeminiKey();
+   geminiIssue = null;
    if (result?.kind === 'gemini') result = null;
    if (['inspect', 'model'].includes(view)) render();
    toast('Gemini 키 연결을 해제했습니다.');
@@ -130,6 +135,7 @@ async function runGemini() {
  const activeChecklist = checklist;
  const activeConnection = gemini;
  analyzingImage = image;
+ geminiIssue = null;
  if (result?.kind === 'gemini') result = null;
  render();
  try {
@@ -139,6 +145,13 @@ async function runGemini() {
      kind: 'gemini', label: response.status, model: response.model, scores: [],
      defects: response.defects, note: response.observation, nextCheck: response.nextCheck, createdAt: now(),
    };
+ } catch (error) {
+   if (selected === image && checklist === activeChecklist && gemini === activeConnection) {
+     const message = error.name === 'TimeoutError' || error.name === 'TypeError'
+       ? 'Gemini 응답을 받지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도하세요.'
+       : error.message || 'Gemini 분석 중 문제가 발생했습니다.';
+     geminiIssue = { image, checklist: activeChecklist, message };
+   }
  } finally {
    analyzingImage = null;
    if (view === 'inspect') render();
